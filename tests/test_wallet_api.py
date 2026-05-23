@@ -356,6 +356,19 @@ def test_wallet_pages_expose_transfer_and_github_claim_flows(sqlite_url: str) ->
     assert "Link a wallet" in me
 
 
+def test_wallet_detail_page_shows_registered_label(sqlite_url: str) -> None:
+    create_schema(sqlite_url)
+    _, public_hex, address = _keypair()
+    client = TestClient(create_app(database_url=sqlite_url, webhook_secret="secret"))
+    _register_wallet(client, public_hex, "Ops payout wallet")
+
+    detail = client.get(f"/wallets/{address}")
+
+    assert detail.status_code == 200
+    assert "<dt>Label</dt>" in detail.text
+    assert "Ops payout wallet" in detail.text
+
+
 def test_wallet_pages_do_not_require_manual_nonce(sqlite_url: str, monkeypatch) -> None:
     monkeypatch.setenv("MERGEWORK_COOKIE_SECRET", "test-cookie-secret")
     client = TestClient(
