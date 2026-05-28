@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi.testclient import TestClient
 
 from app.accounts import account_api_context, account_page_context, normalized_account
@@ -93,6 +95,11 @@ def test_registered_account_routes_preserve_api_and_page_shapes(sqlite_url: str)
     assert "github:bob" in page_response.text
     assert "25 MRWK" in page_response.text
     assert '<p class="reference-cell">' in page_response.text
+    assert re.search(
+        rf">Bounty #{bounty.id}</a>\s+-\s+"
+        r'<a href="https://github.com/ramimbo/mergework/issues/178">',
+        page_response.text,
+    )
     assert f'href="/proofs/{proof.hash}"' in page_response.text
 
 

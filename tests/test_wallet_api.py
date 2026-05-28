@@ -554,6 +554,7 @@ def test_wallet_pages_expose_transfer_and_github_claim_flows(sqlite_url: str) ->
     assert "Main smoke wallet" in wallets
     assert "Main smoke wallet" in detail
     assert "Search wallets" in wallets
+    assert 'Showing wallets matching "Main".' in main_search
     assert "Main smoke wallet" in main_search
     assert "Funded smoke wallet" not in main_search
     assert "alice-smoke" in github_search

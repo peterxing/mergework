@@ -28,7 +28,7 @@
   <a href="/bounties?status=paid{% if query_text %}&q={{ query_text | urlencode }}{% endif %}{% if selected_sort != "newest" %}&sort={{ selected_sort }}{% endif %}{% if selected_limit %}&limit={{ selected_limit }}{% endif %}"{% if selected_status == "paid" %} aria-current="page"{% endif %}>Paid</a>
   <a href="/bounties?status=closed{% if query_text %}&q={{ query_text | urlencode }}{% endif %}{% if selected_sort != "newest" %}&sort={{ selected_sort }}{% endif %}{% if selected_limit %}&limit={{ selected_limit }}{% endif %}"{% if selected_status == "closed" %} aria-current="page"{% endif %}>Closed</a>
 </nav>
-{% if query_text %}<p>Showing matches for “{{ query_text }}”.</p>{% endif %}
+{% if query_text %}<p>Showing matches for "{{ query_text }}".</p>{% endif %}
 <section class="bounty-list-summary" aria-label="Bounty list summary">
   <article>
     <span>Bounties shown</span>
@@ -56,12 +56,12 @@
     <p class="bounty-card-meta">
       {% set issue_url = safe_public_url(bounty.issue_url) %}
       {% if issue_url %}
-      <a href="{{ issue_url }}" rel="nofollow noopener">{{ bounty.repo }} #{{ bounty.issue_number }}</a> ·
+      <a href="{{ issue_url }}" rel="nofollow noopener">{{ bounty.repo }} #{{ bounty.issue_number }}</a> -
       {% else %}
-      {{ bounty.repo }} #{{ bounty.issue_number }} ·
+      {{ bounty.repo }} #{{ bounty.issue_number }} -
       {% endif %}
-      <strong>{{ bounty.reward_mrwk }} MRWK</strong> per award ·
-      {{ bounty.available_mrwk }} MRWK still available ·
+      <strong>{{ bounty.reward_mrwk }} MRWK</strong> per award -
+      {{ bounty.available_mrwk }} MRWK still available -
       {{ bounty.awards_remaining }}/{{ bounty.max_awards }} awards open
     </p>
     <p>{{ bounty.acceptance }}</p>
