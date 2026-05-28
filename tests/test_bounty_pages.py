@@ -617,6 +617,8 @@ def test_ledger_and_proof_pages_make_bounty_payments_scannable(sqlite_url: str) 
     assert "MergeWork bounty" in proof_page.text
     assert f'href="/bounties/{bounty.id}"' in proof_page.text
     assert f'href="/ledger/{payment_sequence}"' in proof_page.text
+    assert "Canonical proof URL" in proof_page.text
+    assert f'href="/proofs/{proof_hash}"><code>/proofs/{proof_hash}</code></a>' in proof_page.text
     assert "Related activity" in proof_page.text
     assert 'href="/activity?q=github%3Acontributor"' in proof_page.text
     assert f'href="/activity?q={proof_hash}"' in proof_page.text
@@ -626,6 +628,10 @@ def test_ledger_and_proof_pages_make_bounty_payments_scannable(sqlite_url: str) 
     uppercase_proof_page = client.get(f"/proofs/{proof_hash.upper()}")
     assert uppercase_proof_page.status_code == 200
     assert f'<code class="hash">{proof_hash}</code>' in uppercase_proof_page.text
+    assert (
+        f'href="/proofs/{proof_hash}"><code>/proofs/{proof_hash}</code></a>'
+        in uppercase_proof_page.text
+    )
     assert f'<code class="hash">{proof_hash.upper()}</code>' not in uppercase_proof_page.text
 
     missing_proof = client.get(f"/api/v1/proofs/{'0' * 64}")

@@ -26,6 +26,11 @@
       <code class="hash">{{ proof_hash }}</code>
     </article>
     <article>
+      <span>Canonical proof URL</span>
+      <strong><a href="/proofs/{{ proof_hash }}">/proofs/{{ proof_hash[:12] }}</a></strong>
+      <code class="hash">/proofs/{{ proof_hash }}</code>
+    </article>
+    <article>
       <span>Ledger hash</span>
       <code class="hash">{{ proof.ledger_hash }}</code>
     </article>
@@ -49,6 +54,8 @@
     <dt>Submission</dt>
     {% set submission_url = safe_public_url(proof.submission_url) %}
     <dd>{% if submission_url %}<a href="{{ submission_url }}">{{ proof.submission_url }}</a>{% else %}{{ proof.submission_url }}{% endif %}</dd>
+    <dt>Canonical proof URL</dt>
+    <dd><a href="/proofs/{{ proof_hash }}"><code>/proofs/{{ proof_hash }}</code></a></dd>
   </dl>
   {% if proof.kind == "bounty_payment" %}
   <div class="section-head">
