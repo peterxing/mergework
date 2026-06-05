@@ -20,6 +20,17 @@ Out of scope:
 - Live-system security testing without explicit written authorization.
 - High-volume outreach or private-community posting.
 
+## Fast Unblocker
+
+For a stale but plausibly mergeable PR, the same packet can be scoped as a 24-hour unblocker. It answers only the decision questions a maintainer needs before acting:
+
+- Is the PR still open, non-draft, and mergeable against the current base?
+- Does the patch still match the issue, bounty, or maintainer ask?
+- Are there visible review comments, CI failures, or stale assumptions that block merge?
+- What exact maintainer action is requested: merge, request changes, rerun CI, or close?
+
+This format is useful for small bounty PRs, dependency cleanup PRs, and agent-made proof implementations where the main risk is stale context rather than a large code review.
+
 ## Deliverable Format
 
 The deliverable is a concise public GitHub comment or Markdown packet:
