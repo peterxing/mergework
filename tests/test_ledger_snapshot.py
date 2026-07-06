@@ -16,8 +16,10 @@ from app.ledger.snapshot import (
     LEDGER_SNAPSHOT_SCHEMA,
     LEDGER_SNAPSHOT_SCHEMA_VERSION,
     ledger_snapshot,
+    ledger_snapshot_account_proof,
     ledger_snapshot_json,
     ledger_snapshot_schema_json,
+    verify_ledger_snapshot_account_proof,
 )
 from app.models import LedgerEntry
 from scripts.export_ledger_snapshot import main as export_ledger_snapshot_main
@@ -77,6 +79,10 @@ def test_ledger_snapshot_exports_deterministic_integer_balances(sqlite_url: str)
     assert first["genesis_supply_microunits"] == GENESIS_SUPPLY_MICRO
     assert first["ledger_anchor"]["latest_sequence"] == 3
     assert isinstance(first["ledger_anchor"]["latest_entry_hash"], str)
+    assert first["merkle"]["hash_algorithm"] == "sha256"
+    assert first["merkle"]["account_count"] == 3
+    assert first["merkle"]["root"]
+    assert first["merkle"]["account_root"]
     assert first["verification"] == {
         "hash_chain_ok": True,
         "supply_conservation_ok": True,
@@ -95,6 +101,97 @@ def test_ledger_snapshot_exports_deterministic_integer_balances(sqlite_url: str)
         },
     ]
     assert all(isinstance(row["balance_microunits"], int) for row in first["accounts"])
+
+
+def test_ledger_snapshot_merkle_root_ignores_generated_at_and_source(sqlite_url: str) -> None:
+    create_schema(sqlite_url)
+
+    with session_scope(sqlite_url) as session:
+        ensure_genesis(session)
+        first = ledger_snapshot(
+            session,
+            generated_at=datetime(2026, 6, 2, 12, 0, tzinfo=UTC),
+            source_mode="database",
+            source_host="https://one.example",
+        )
+        second = ledger_snapshot(
+            session,
+            generated_at=datetime(2026, 6, 3, 12, 0, tzinfo=UTC),
+            source_mode="api",
+            source_host="https://two.example",
+        )
+
+    assert first["generated_at"] != second["generated_at"]
+    assert first["source"] != second["source"]
+    assert first["merkle"] == second["merkle"]
+
+
+def test_ledger_snapshot_account_proof_verifies_and_rejects_tampering(
+    sqlite_url: str,
+) -> None:
+    create_schema(sqlite_url)
+
+    with session_scope(sqlite_url) as session:
+        ensure_genesis(session)
+        add_ledger_entry(
+            session,
+            entry_type="test_payment",
+            from_account=TREASURY_ACCOUNT,
+            to_account="github:alice",
+            amount_microunits=3_000_000,
+            reference="test:alice",
+        )
+        add_ledger_entry(
+            session,
+            entry_type="test_payment",
+            from_account=TREASURY_ACCOUNT,
+            to_account="github:bob",
+            amount_microunits=2_000_000,
+            reference="test:bob",
+        )
+        snapshot = ledger_snapshot(session, generated_at=datetime(2026, 6, 2, tzinfo=UTC))
+
+    proof = ledger_snapshot_account_proof(snapshot, "github:alice")
+
+    assert proof["schema"] == "mergework.ledger_snapshot_account_proof.v1"
+    assert proof["account"] == "github:alice"
+    assert proof["balance_microunits"] == 3_000_000
+    assert proof["account_count"] == 3
+    assert proof["root"] == snapshot["merkle"]["root"]
+    assert verify_ledger_snapshot_account_proof(proof) is True
+
+    tampered_balance = {**proof, "balance_microunits": 4_000_000}
+    tampered_anchor = {
+        **proof,
+        "ledger_anchor": {**proof["ledger_anchor"], "latest_sequence": 99},
+    }
+    tampered_sibling = {**proof, "siblings": [{**proof["siblings"][0], "hash": "0" * 64}]}
+
+    assert verify_ledger_snapshot_account_proof(tampered_balance) is False
+    assert verify_ledger_snapshot_account_proof(tampered_anchor) is False
+    assert verify_ledger_snapshot_account_proof(tampered_sibling) is False
+
+
+def test_ledger_snapshot_single_account_proof_has_empty_path(sqlite_url: str) -> None:
+    create_schema(sqlite_url)
+
+    with session_scope(sqlite_url) as session:
+        add_ledger_entry(
+            session,
+            entry_type="test_single",
+            from_account=None,
+            to_account="github:alice",
+            amount_microunits=1,
+            reference="test:single",
+        )
+        snapshot = ledger_snapshot(session, generated_at=datetime(2026, 6, 2, tzinfo=UTC))
+
+    proof = ledger_snapshot_account_proof(snapshot, "github:alice")
+
+    assert snapshot["merkle"]["account_count"] == 1
+    assert proof["siblings"] == []
+    assert proof["account_root"] == proof["leaf_hash"]
+    assert verify_ledger_snapshot_account_proof(proof) is True
 
 
 def test_ledger_snapshot_reports_hash_chain_failure(sqlite_url: str) -> None:
@@ -141,6 +238,9 @@ def test_ledger_snapshot_handles_empty_ledger(sqlite_url: str) -> None:
 
     assert snapshot["ledger_anchor"] == {"latest_sequence": 0, "latest_entry_hash": None}
     assert snapshot["accounts"] == []
+    assert snapshot["merkle"]["account_count"] == 0
+    assert snapshot["merkle"]["root"]
+    assert snapshot["merkle"]["account_root"]
     assert snapshot["totals"] == {
         "credited_microunits": 0,
         "debited_microunits": 0,
@@ -197,6 +297,43 @@ def test_exporter_main_accepts_snapshot_argv(sqlite_url: str, capsys) -> None:
     assert snapshot["verification"]["hash_chain_ok"] is True
 
 
+def test_exporter_main_prints_and_verifies_account_proof(
+    sqlite_url: str, tmp_path, capsys
+) -> None:
+    create_schema(sqlite_url)
+
+    with session_scope(sqlite_url) as session:
+        ensure_genesis(session)
+        add_ledger_entry(
+            session,
+            entry_type="test_payment",
+            from_account=TREASURY_ACCOUNT,
+            to_account="github:alice",
+            amount_microunits=1_000_000,
+            reference="test:alice",
+        )
+
+    assert (
+        export_ledger_snapshot_main(
+            [
+                "--database-url",
+                sqlite_url,
+                "--account-proof",
+                "github:alice",
+            ]
+        )
+        == 0
+    )
+    proof = json.loads(capsys.readouterr().out)
+    assert verify_ledger_snapshot_account_proof(proof) is True
+
+    proof_path = tmp_path / "proof.json"
+    proof_path.write_text(json.dumps(proof), encoding="utf-8")
+
+    assert export_ledger_snapshot_main(["--verify-account-proof", str(proof_path)]) == 0
+    assert json.loads(capsys.readouterr().out) == {"valid": True}
+
+
 def test_ledger_snapshot_schema_is_deterministic_json() -> None:
     schema = json.loads(ledger_snapshot_schema_json())
 
@@ -204,4 +341,5 @@ def test_ledger_snapshot_schema_is_deterministic_json() -> None:
     assert schema["properties"]["accounts"]["items"]["properties"]["balance_microunits"] == {
         "type": "integer"
     }
+    assert schema["properties"]["merkle"]["properties"]["hash_algorithm"] == {"const": "sha256"}
     assert ledger_snapshot_schema_json() == ledger_snapshot_schema_json()
