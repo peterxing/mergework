@@ -126,6 +126,36 @@ def test_submission_quality_gate_fails_reserved_payment_status_assertion() -> No
     } in result["checks"]
 
 
+def test_submission_quality_gate_fails_reserved_wording_alongside_allowlisted_terms() -> None:
+    result = evaluate_submission(
+        {
+            "submission_text": """
+            Summary:
+            Add a focused pre-submission wording guard.
+
+            Refs #319
+
+            Per the docs, this submission is paid.
+
+            Validation:
+            - pytest passed.
+            """,
+            "bounties": [{"number": 319, "state": "OPEN", "awards_remaining": 1}],
+            "pull_requests": [],
+        }
+    )
+
+    assert result["status"] == "fail"
+    assert {
+        "name": "payment_status_language",
+        "status": "fail",
+        "message": (
+            "reserve paid, settled, received, and withdrawable status claims for "
+            "proof-backed ledger outcomes"
+        ),
+    } in result["checks"]
+
+
 def test_submission_quality_gate_accepts_neutral_submission_status_wording() -> None:
     result = evaluate_submission(
         {

@@ -337,28 +337,28 @@ def _has_evidence(text: str) -> bool:
 
 
 def _payment_status_language_check(text: str) -> dict[str, str]:
-    if PAYMENT_STATUS_HEADING_RE.search(text):
-        return _check(
-            "payment_status_language",
-            "fail",
-            "replace `Payout boundary` status wording with neutral `Submission status` text",
-        )
-    if PAYMENT_STATUS_BOUNDARY_RE.search(text):
-        return _check(
-            "payment_status_language",
-            "fail",
-            "avoid saying submitted work is not confirmed, earned, accepted, paid, settled, "
-            "received, or withdrawable; use neutral submission-status wording",
-        )
     for line in text.splitlines():
-        if PAYMENT_STATUS_CONTEXT_ALLOW_RE.search(line):
-            continue
         if PAYMENT_STATUS_ASSERTION_RE.search(line):
             return _check(
                 "payment_status_language",
                 "fail",
                 "reserve paid, settled, received, and withdrawable status claims for "
                 "proof-backed ledger outcomes",
+            )
+        if PAYMENT_STATUS_CONTEXT_ALLOW_RE.search(line):
+            continue
+        if PAYMENT_STATUS_HEADING_RE.search(line):
+            return _check(
+                "payment_status_language",
+                "fail",
+                "replace `Payout boundary` status wording with neutral `Submission status` text",
+            )
+        if PAYMENT_STATUS_BOUNDARY_RE.search(line):
+            return _check(
+                "payment_status_language",
+                "fail",
+                "avoid saying submitted work is not confirmed, earned, accepted, paid, settled, "
+                "received, or withdrawable; use neutral submission-status wording",
             )
     return _check(
         "payment_status_language",
