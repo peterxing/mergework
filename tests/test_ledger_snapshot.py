@@ -171,6 +171,16 @@ def test_ledger_snapshot_account_proof_verifies_and_rejects_tampering(
     assert verify_ledger_snapshot_account_proof(tampered_anchor) is False
     assert verify_ledger_snapshot_account_proof(tampered_sibling) is False
 
+    tampered_schema = {**proof, "schema": "mergework.ledger_snapshot_account_proof.v0"}
+    tampered_schema_version = {**proof, "schema_version": proof["schema_version"] + 1}
+    tampered_hash_algorithm = {**proof, "hash_algorithm": "sha512"}
+    tampered_account = {**proof, "account": "github:bob"}
+
+    assert verify_ledger_snapshot_account_proof(tampered_schema) is False
+    assert verify_ledger_snapshot_account_proof(tampered_schema_version) is False
+    assert verify_ledger_snapshot_account_proof(tampered_hash_algorithm) is False
+    assert verify_ledger_snapshot_account_proof(tampered_account) is False
+
 
 def test_ledger_snapshot_single_account_proof_has_empty_path(sqlite_url: str) -> None:
     create_schema(sqlite_url)
@@ -332,6 +342,35 @@ def test_exporter_main_prints_and_verifies_account_proof(
 
     assert export_ledger_snapshot_main(["--verify-account-proof", str(proof_path)]) == 0
     assert json.loads(capsys.readouterr().out) == {"valid": True}
+
+
+def test_exporter_main_reports_bad_proof_inputs(sqlite_url: str, tmp_path, capsys) -> None:
+    create_schema(sqlite_url)
+
+    with session_scope(sqlite_url) as session:
+        ensure_genesis(session)
+
+    assert (
+        export_ledger_snapshot_main(
+            [
+                "--database-url",
+                sqlite_url,
+                "--account-proof",
+                "github:missing",
+            ]
+        )
+        == 1
+    )
+    assert "error: account not found in snapshot" in capsys.readouterr().err
+
+    missing_path = tmp_path / "missing-proof.json"
+    assert export_ledger_snapshot_main(["--verify-account-proof", str(missing_path)]) == 1
+    assert "error: could not read proof file:" in capsys.readouterr().err
+
+    malformed_path = tmp_path / "malformed-proof.json"
+    malformed_path.write_text("{", encoding="utf-8")
+    assert export_ledger_snapshot_main(["--verify-account-proof", str(malformed_path)]) == 1
+    assert "error: could not read proof file:" in capsys.readouterr().err
 
 
 def test_ledger_snapshot_schema_is_deterministic_json() -> None:

@@ -63,8 +63,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(ledger_snapshot_schema_json())
         return 0
     if args.verify_account_proof:
-        with Path(args.verify_account_proof).open(encoding="utf-8") as proof_file:
-            proof = json.load(proof_file)
+        try:
+            with Path(args.verify_account_proof).open(encoding="utf-8") as proof_file:
+                proof = json.load(proof_file)
+        except (OSError, json.JSONDecodeError) as exc:
+            sys.stderr.write(f"error: could not read proof file: {exc}\n")
+            return 1
         sys.stdout.write(json.dumps({"valid": verify_ledger_snapshot_account_proof(proof)}) + "\n")
         return 0
 
@@ -78,9 +82,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             source_host=source_host,
         )
         if args.account_proof:
-            sys.stdout.write(
-                ledger_snapshot_json(ledger_snapshot_account_proof(snapshot, args.account_proof))
-            )
+            try:
+                proof_payload = ledger_snapshot_account_proof(snapshot, args.account_proof)
+            except ValueError as exc:
+                sys.stderr.write(f"error: {exc}\n")
+                return 1
+            sys.stdout.write(ledger_snapshot_json(proof_payload))
         else:
             sys.stdout.write(ledger_snapshot_json(snapshot))
     return 0
