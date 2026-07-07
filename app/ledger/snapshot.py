@@ -429,9 +429,7 @@ def _account_tree_root(accounts: list[dict[str, Any]]) -> str:
     level = [_account_leaf_hash(row) for row in accounts]
     while len(level) > 1:
         level = [
-            _branch_hash(level[index], level[index + 1])
-            if index + 1 < len(level)
-            else level[index]
+            _branch_hash(level[index], level[index + 1]) if index + 1 < len(level) else level[index]
             for index in range(0, len(level), 2)
         ]
     return level[0]

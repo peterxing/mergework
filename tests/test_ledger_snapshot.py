@@ -307,9 +307,7 @@ def test_exporter_main_accepts_snapshot_argv(sqlite_url: str, capsys) -> None:
     assert snapshot["verification"]["hash_chain_ok"] is True
 
 
-def test_exporter_main_prints_and_verifies_account_proof(
-    sqlite_url: str, tmp_path, capsys
-) -> None:
+def test_exporter_main_prints_and_verifies_account_proof(sqlite_url: str, tmp_path, capsys) -> None:
     create_schema(sqlite_url)
 
     with session_scope(sqlite_url) as session:
