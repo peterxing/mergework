@@ -215,7 +215,9 @@ For read-only Phase 2A ledger reconciliation, use the local snapshot exporter:
 python scripts/export_ledger_snapshot.py > ledger-snapshot.json
 python scripts/export_ledger_snapshot.py --schema > ledger-snapshot.schema.json
 python scripts/export_ledger_snapshot.py --account-proof github:alice > alice-proof.json
-python scripts/export_ledger_snapshot.py --verify-account-proof alice-proof.json
+python scripts/export_ledger_snapshot.py \
+  --verify-account-proof alice-proof.json \
+  --expected-root <trusted-merkle-root-from-ledger-snapshot.json>
 ```
 
 Snapshots include committed ledger balances in integer microunits, hash-chain
@@ -229,8 +231,11 @@ account balances. The root is bound to the latest committed ledger sequence and
 entry hash, but deliberately excludes `generated_at` and `source` metadata so
 equivalent database snapshots have stable roots across export hosts and times.
 Account proofs use integer microunit balances, versioned domain-separated
-leaf/branch/root payloads, and can be verified locally with the exporter without
-signing, moving funds, or treating a snapshot as an exchange or bridge claim.
+leaf/branch/root payloads, and can be verified locally against a trusted
+snapshot `merkle.root` with the exporter without signing, moving funds, or
+treating a snapshot as an exchange or bridge claim. The proof's embedded root is
+not trusted by itself; verification must compare it to a root taken from the
+specific snapshot being checked.
 
 ## MCP Endpoint
 

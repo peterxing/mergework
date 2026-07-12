@@ -158,7 +158,8 @@ def test_ledger_snapshot_account_proof_verifies_and_rejects_tampering(
     assert proof["balance_microunits"] == 3_000_000
     assert proof["account_count"] == 3
     assert proof["root"] == snapshot["merkle"]["root"]
-    assert verify_ledger_snapshot_account_proof(proof) is True
+    expected_root = snapshot["merkle"]["root"]
+    assert verify_ledger_snapshot_account_proof(proof, expected_root=expected_root) is True
 
     tampered_balance = {**proof, "balance_microunits": 4_000_000}
     tampered_anchor = {
@@ -167,19 +168,35 @@ def test_ledger_snapshot_account_proof_verifies_and_rejects_tampering(
     }
     tampered_sibling = {**proof, "siblings": [{**proof["siblings"][0], "hash": "0" * 64}]}
 
-    assert verify_ledger_snapshot_account_proof(tampered_balance) is False
-    assert verify_ledger_snapshot_account_proof(tampered_anchor) is False
-    assert verify_ledger_snapshot_account_proof(tampered_sibling) is False
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_balance, expected_root=expected_root) is False
+    )
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_anchor, expected_root=expected_root) is False
+    )
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_sibling, expected_root=expected_root) is False
+    )
 
     tampered_schema = {**proof, "schema": "mergework.ledger_snapshot_account_proof.v0"}
     tampered_schema_version = {**proof, "schema_version": proof["schema_version"] + 1}
     tampered_hash_algorithm = {**proof, "hash_algorithm": "sha512"}
     tampered_account = {**proof, "account": "github:bob"}
 
-    assert verify_ledger_snapshot_account_proof(tampered_schema) is False
-    assert verify_ledger_snapshot_account_proof(tampered_schema_version) is False
-    assert verify_ledger_snapshot_account_proof(tampered_hash_algorithm) is False
-    assert verify_ledger_snapshot_account_proof(tampered_account) is False
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_schema, expected_root=expected_root) is False
+    )
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_schema_version, expected_root=expected_root)
+        is False
+    )
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_hash_algorithm, expected_root=expected_root)
+        is False
+    )
+    assert (
+        verify_ledger_snapshot_account_proof(tampered_account, expected_root=expected_root) is False
+    )
 
 
 def test_ledger_snapshot_single_account_proof_has_empty_path(sqlite_url: str) -> None:
@@ -201,7 +218,10 @@ def test_ledger_snapshot_single_account_proof_has_empty_path(sqlite_url: str) ->
     assert snapshot["merkle"]["account_count"] == 1
     assert proof["siblings"] == []
     assert proof["account_root"] == proof["leaf_hash"]
-    assert verify_ledger_snapshot_account_proof(proof) is True
+    assert (
+        verify_ledger_snapshot_account_proof(proof, expected_root=snapshot["merkle"]["root"])
+        is True
+    )
 
 
 def test_ledger_snapshot_reports_hash_chain_failure(sqlite_url: str) -> None:
@@ -333,13 +353,32 @@ def test_exporter_main_prints_and_verifies_account_proof(sqlite_url: str, tmp_pa
         == 0
     )
     proof = json.loads(capsys.readouterr().out)
-    assert verify_ledger_snapshot_account_proof(proof) is True
+    assert verify_ledger_snapshot_account_proof(proof, expected_root=proof["root"]) is True
+    assert verify_ledger_snapshot_account_proof(proof, expected_root="0" * 64) is False
 
     proof_path = tmp_path / "proof.json"
     proof_path.write_text(json.dumps(proof), encoding="utf-8")
 
-    assert export_ledger_snapshot_main(["--verify-account-proof", str(proof_path)]) == 0
-    assert json.loads(capsys.readouterr().out) == {"valid": True}
+    assert (
+        export_ledger_snapshot_main(
+            ["--verify-account-proof", str(proof_path), "--expected-root", proof["root"]]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out) == {
+        "valid": True,
+        "expected_root": proof["root"],
+    }
+    assert (
+        export_ledger_snapshot_main(
+            ["--verify-account-proof", str(proof_path), "--expected-root", "0" * 64]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out) == {
+        "valid": False,
+        "expected_root": "0" * 64,
+    }
 
 
 def test_exporter_main_reports_bad_proof_inputs(sqlite_url: str, tmp_path, capsys) -> None:
@@ -363,11 +402,26 @@ def test_exporter_main_reports_bad_proof_inputs(sqlite_url: str, tmp_path, capsy
 
     missing_path = tmp_path / "missing-proof.json"
     assert export_ledger_snapshot_main(["--verify-account-proof", str(missing_path)]) == 1
+    assert (
+        "error: --expected-root is required with --verify-account-proof" in capsys.readouterr().err
+    )
+
+    assert (
+        export_ledger_snapshot_main(
+            ["--verify-account-proof", str(missing_path), "--expected-root", "0" * 64]
+        )
+        == 1
+    )
     assert "error: could not read proof file:" in capsys.readouterr().err
 
     malformed_path = tmp_path / "malformed-proof.json"
     malformed_path.write_text("{", encoding="utf-8")
-    assert export_ledger_snapshot_main(["--verify-account-proof", str(malformed_path)]) == 1
+    assert (
+        export_ledger_snapshot_main(
+            ["--verify-account-proof", str(malformed_path), "--expected-root", "0" * 64]
+        )
+        == 1
+    )
     assert "error: could not read proof file:" in capsys.readouterr().err
 
 

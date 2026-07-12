@@ -229,8 +229,11 @@ def ledger_snapshot_account_proof(snapshot: dict[str, Any], account: str) -> dic
     raise ValueError("account not found in snapshot")
 
 
-def verify_ledger_snapshot_account_proof(proof: dict[str, Any]) -> bool:
+def verify_ledger_snapshot_account_proof(proof: dict[str, Any], *, expected_root: str) -> bool:
+    """Verify an account proof against a trusted snapshot Merkle root."""
     try:
+        if not isinstance(expected_root, str):
+            return False
         if proof["schema"] != LEDGER_SNAPSHOT_ACCOUNT_PROOF_SCHEMA:
             return False
         if proof["schema_version"] != LEDGER_SNAPSHOT_ACCOUNT_PROOF_SCHEMA_VERSION:
@@ -281,7 +284,7 @@ def verify_ledger_snapshot_account_proof(proof: dict[str, Any]) -> bool:
             account_count=account_count,
             ledger_anchor=_clean_ledger_anchor(ledger_anchor),
         )
-        return proof_root == root
+        return proof_root == root == expected_root
     except (KeyError, TypeError, ValueError):
         return False
 

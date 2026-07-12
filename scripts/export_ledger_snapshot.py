@@ -58,18 +58,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--verify-account-proof",
         help="Read a Merkle account proof JSON file and print whether it verifies.",
     )
+    parser.add_argument(
+        "--expected-root",
+        help="Trusted snapshot merkle.root required when verifying an account proof.",
+    )
     args = parser.parse_args(argv)
     if args.schema:
         sys.stdout.write(ledger_snapshot_schema_json())
         return 0
     if args.verify_account_proof:
+        if not args.expected_root:
+            sys.stderr.write("error: --expected-root is required with --verify-account-proof\n")
+            return 1
         try:
             with Path(args.verify_account_proof).open(encoding="utf-8") as proof_file:
                 proof = json.load(proof_file)
         except (OSError, json.JSONDecodeError) as exc:
             sys.stderr.write(f"error: could not read proof file: {exc}\n")
             return 1
-        sys.stdout.write(json.dumps({"valid": verify_ledger_snapshot_account_proof(proof)}) + "\n")
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "valid": verify_ledger_snapshot_account_proof(
+                        proof, expected_root=args.expected_root
+                    ),
+                    "expected_root": args.expected_root,
+                }
+            )
+            + "\n"
+        )
         return 0
 
     settings = get_settings()
